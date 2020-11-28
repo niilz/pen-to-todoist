@@ -20,7 +20,6 @@ pub mod vision_api;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
-use todoist::Todoist;
 //use vision_api::img_data_to_string;
 
 /*

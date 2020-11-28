@@ -70,9 +70,22 @@ pub mod vision_api {
 
 pub mod todoist {
     use serde::{Deserialize, Serialize};
+
     // ###### todoist types #######
-    #[derive(Debug, Serialize, Deserialize, Default, PartialEq)]
+    #[derive(Debug, Serialize)]
     pub struct Project {
+        name: String,
+    }
+    impl Project {
+        pub fn new(name: &str) -> Self {
+            Project {
+                name: name.to_string(),
+            }
+        }
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    pub struct ProjectResponse {
         pub id: u64,
         pub name: String,
         pub comment_count: Option<u32>,
@@ -83,17 +96,10 @@ pub mod todoist {
         pub favorite: Option<bool>,
         pub inbox_project: Option<bool>,
     }
-    impl Project {
-        pub fn new(name: &str) -> Self {
-            let mut proj = Project::default();
-            proj.name = name.to_string();
-            proj
-        }
-    }
 
     #[derive(Debug, Deserialize, Serialize, Default)]
     pub struct Task {
-        pub content: String,
+        content: String,
         project_id: Option<u64>,
         label_ids: Option<Vec<u32>>,
         // only one due_* can be used

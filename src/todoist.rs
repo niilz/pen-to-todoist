@@ -1,179 +1,91 @@
-use crate::types;
+use crate::types::todoist::{Project, ProjectResponse, Task, TaskResponse};
 use crate::utils;
-use chrono::Utc;
 use js_sys::Array;
 use serde::{Deserialize, Serialize};
-use types::todoist::{Project, Task, TaskResponse};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{self, Headers, Request, RequestInit, Response};
 
-static PROJECTS_URL: &str = "https://api.todoist.com/rest/v1/projects";
-static TASKS_URL: &str = "https://api.todoist.com/rest/v1/tasks";
-static SHOPPING_LIST: &str = "Einkaufsliste";
+const PROJECTS_URL: &str = "https://api.todoist.com/rest/v1/projects";
+const TASKS_URL: &str = "https://api.todoist.com/rest/v1/tasks";
+const SHOPPING_LIST: &str = "Einkaufsliste";
+const TOKEN: &str = "3d3698a47222e41791894ab11a71c8c912aa1b90";
 
 #[wasm_bindgen]
-#[derive(PartialEq)]
-pub struct Todoist {
-    client: (),
-    token: String,
-    list_of_projects: Option<Vec<Project>>,
-}
-
-#[derive(Serialize, Debug, Deserialize)]
-pub enum TodoistItem {
-    Project(Project),
-    Task(Task),
-}
-impl TodoistItem {
-    fn to_json_body(&self) -> String {
-        match self {
-            Self::Project(proj) => serde_json::to_string(&proj).unwrap(),
-            Self::Task(task) => serde_json::to_string(&task).unwrap(),
+pub async fn make_shopping_list(items: Array) -> JsValue {
+    match get_shopping_list_id().await {
+        Some(shopping_list_id) => {
+            console_log("todoist.rs/make_shopping_list():", &"Creating tasks.");
+            for item in items.iter() {
+                let item_res = create_task(Task::new(&item.as_string().unwrap(), shopping_list_id))
+                    .await
+                    .expect("Could not create item. sorryyyy");
+                console_log("item_res", &item_res);
+            }
+            JsValue::from(shopping_list_id as f64)
         }
-    }
-    fn get_url(&self) -> &str {
-        match self {
-            Self::Project(_) => PROJECTS_URL,
-            Self::Task(_) => TASKS_URL,
-        }
+        None => JsValue::NULL,
     }
 }
 
-enum TodoistItemResponse {
-    A(Project),
-    B(TaskResponse),
+async fn get_shopping_list_id() -> Option<u64> {
+    let projects: Vec<ProjectResponse> = fetch_all_projects()
+        .await
+        .expect("Could not get all Projects");
+    let maybe_shopping_list = projects.iter().find(|proj| proj.name == SHOPPING_LIST);
+    match maybe_shopping_list {
+        Some(list) => Some(list.id),
+        None => {
+            let new_project = create_project(Project::new(SHOPPING_LIST))
+                .await
+                .expect("Could not create ShoppingList-Project");
+            Some(new_project.id)
+        }
+    }
 }
 
-#[wasm_bindgen]
-impl Todoist {
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        // let token = dotenv::var("TODOIST_TOKEN").unwrap();
-        let token = "3d3698a47222e41791894ab11a71c8c912aa1b90".to_string();
-        /*
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("application/json"),
-        );
-        let client = Client::builder().default_headers(headers).build().unwrap();
-        */
-        Todoist {
-            client: (),
-            token,
-            list_of_projects: None,
-        }
+async fn create_project(project: Project) -> Option<ProjectResponse> {
+    console_log("project", &project);
+    let project_json = serde_json::to_string(&project).expect("Could not convert project to json");
+    console_log("project_json", &project_json);
+    let request = init_request("POST", PROJECTS_URL, Some(&project_json));
+
+    let json = fetch(request).await;
+    match json {
+        Ok(json) => json.into_serde::<ProjectResponse>().ok(),
+        Err(e) => None,
     }
+}
 
-    pub async fn make_shopping_list(self, items: Array) -> JsValue {
-        match self.get_shopping_list_id().await {
-            (Some(new_self), Some(shopping_list_id)) => {
-                println!("todoist.rs/make_shopping_list(): Creating tasks.");
-                let mut loop_self = new_self;
-                for item in items.iter() {
-                    let (ls, item_res) = loop_self
-                        .create_item(TodoistItem::Task(Task::new(
-                            &item.as_string().unwrap(),
-                            shopping_list_id,
-                        )))
-                        .await
-                        .expect("Could not create item. sorryyyy");
-                    loop_self = ls;
-                }
-                JsValue::from(shopping_list_id as f64)
-            }
-            (Some(_), None) => JsValue::from("some-none"),
-            (None, Some(_)) => JsValue::from("none-some"),
-            (None, None) => JsValue::from("none-none"),
-        }
+async fn create_task(task: Task) -> Option<TaskResponse> {
+    console_log("item", &task);
+    let task_json = serde_json::to_string(&task).expect("Could not convert task to json");
+    console_log("item", &task_json);
+    let request = init_request("POST", TASKS_URL, Some(&task_json));
+
+    let json = fetch(request).await;
+    match json {
+        Ok(json) => json.into_serde::<TaskResponse>().ok(),
+        Err(e) => None,
     }
+}
 
-    async fn get_shopping_list_id(self) -> (Option<Todoist>, Option<u64>) {
-        let self_with_projects = self
-            .fetch_all_projects()
-            .await
-            .expect("Could not get all Projects");
-        let mut self_to_return = None;
-        let shopping_list_id = match self_with_projects.list_of_projects {
-            Some(ref projects) => {
-                let maybe_shopping_list = projects.iter().find(|proj| proj.name == SHOPPING_LIST);
-                match maybe_shopping_list {
-                    Some(list) => Some(list.id),
-                    None => {
-                        let (self_with_projects, new_list) = self_with_projects
-                            .create_item(TodoistItem::Project(Project::new(SHOPPING_LIST)))
-                            .await
-                            .expect("Could not create ShoppingList");
-                        match new_list {
-                            TodoistItemResponse::A(proj) => {
-                                self_to_return = Some(self_with_projects);
-                                Some(proj.id)
-                            }
-                            _ => Some(42),
-                        }
-                    }
-                }
-            }
-            None => None,
-        };
-        (self_to_return, shopping_list_id)
+fn init_request(mode: &str, url: &str, body: Option<&str>) -> Request {
+    let mut opts = RequestInit::new();
+    opts.method(mode);
+    if body.is_some() {
+        opts.body(Some(&JsValue::from_str(body.unwrap())));
     }
+    console_log("opts", &opts);
+    let request = Request::new_with_str_and_init(url, &opts).expect("Could not create response");
+    console_log("request before headers", &request);
+    request
+        .headers()
+        .set("Authorization", &format!("Bearer {}", TOKEN))
+        .unwrap();
 
-    pub async fn fetch_all_projects(mut self) -> Option<Todoist> {
-        utils::set_panic_hook();
-        let mut opts = RequestInit::new();
-        opts.method("GET");
-        let maybe_request = Request::new_with_str_and_init(PROJECTS_URL, &opts);
-        let request_with_headers = match maybe_request {
-            Ok(request) => {
-                request
-                    .headers()
-                    .set("Authorization", &format!("Bearer {}", self.token));
-                request
-            }
-            Err(e) => return None,
-        };
-
-        let window = web_sys::window().unwrap();
-        match request_with_headers {
-            request => {
-                let resp_value = JsFuture::from(window.fetch_with_request(&request)).await;
-                match resp_value {
-                    Ok(resp_val) => {
-                        let resp: Response = resp_val.dyn_into().unwrap();
-                        let json = JsFuture::from(resp.json().unwrap())
-                            .await
-                            .expect("Could not transform Json");
-                        let list_of_projects: Vec<Project> = json.into_serde().unwrap();
-                        self.list_of_projects = Some(list_of_projects);
-                    }
-                    Err(e) => return None,
-                }
-            }
-            _ => return None,
-        }
-        Some(self)
-    }
-
-    async fn create_item(self, item: TodoistItem) -> Option<(Todoist, TodoistItemResponse)> {
-        let mut opts = RequestInit::new();
-        opts.method("POST");
-        console_log("item", &item);
-        let name = match &item {
-            TodoistItem::Project(proj) => &proj.name,
-            TodoistItem::Task(task) => &task.content,
-        };
-        console_log("name", &name);
-        let name_json = r#"{"name": "#.to_string() + r#"""# + name + r#"""# + "}";
-        console_log("name_json", &name_json);
-        opts.body(Some(&JsValue::from_str(&name_json)));
-        console_log("opts", &opts);
-
-        let request = Request::new_with_str_and_init(item.get_url(), &opts)
-            .expect("Could not create request");
-        console_log("request before headers", &request);
+    if mode == "POST" {
         request
             .headers()
             .set("X-Request-Id", &js_sys::Date::now().to_string())
@@ -182,33 +94,41 @@ impl Todoist {
             .headers()
             .set("Content-Type", "application/json")
             .unwrap();
-        let token = format!("Bearer {}", self.token);
-        request.headers().set("Authorization", &token).unwrap();
+    }
+    request
+}
 
-        let window = web_sys::window().unwrap();
-        console_log("request", &request);
-        let resp_value = JsFuture::from(window.fetch_with_request(&request)).await;
-        console_log("resp_value", &resp_value);
-        match resp_value {
-            Ok(resp_val) => {
-                let resp: Response = resp_val.dyn_into().unwrap();
-                console_log("json", &resp);
-                let json = JsFuture::from(resp.json().unwrap())
-                    .await
-                    .expect("Could not transform Json");
-                match item {
-                    TodoistItem::Project(_) => Some((
-                        self,
-                        TodoistItemResponse::A(json.into_serde::<Project>().unwrap()),
-                    )),
-                    TodoistItem::Task(_) => Some((
-                        self,
-                        TodoistItemResponse::B(json.into_serde::<TaskResponse>().unwrap()),
-                    )),
-                }
-            }
-            Err(e) => return None,
+async fn fetch(request: Request) -> Result<JsValue, JsValue> {
+    let window = web_sys::window().unwrap();
+    console_log("request", &request);
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await;
+    console_log("resp_value", &resp_value);
+    match resp_value {
+        Ok(resp_value) => {
+            let resp: Response = resp_value.dyn_into().unwrap();
+            console_log("json", &resp);
+            JsFuture::from(resp.json().unwrap()).await
         }
+        Err(e) => Err(e),
+    }
+}
+
+async fn fetch_all_projects() -> Option<Vec<ProjectResponse>> {
+    utils::set_panic_hook();
+    let request = init_request("GET", PROJECTS_URL, None);
+
+    let window = web_sys::window().unwrap();
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await;
+    match resp_value {
+        Ok(resp_val) => {
+            let resp: Response = resp_val.dyn_into().unwrap();
+            let json = JsFuture::from(resp.json().unwrap())
+                .await
+                .expect("Could not transform Json");
+            let list_of_projects: Vec<ProjectResponse> = json.into_serde().unwrap();
+            Some(list_of_projects)
+        }
+        Err(e) => None,
     }
 }
 
@@ -220,6 +140,6 @@ where
 }
 
 #[wasm_bindgen]
-pub fn bla() -> String {
+pub fn it_works() -> String {
     "WORKS from RUST".to_string()
 }
