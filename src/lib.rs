@@ -12,6 +12,7 @@
 // - Use retrieved access_token as bearer to make requests to Vision API
 
 pub mod auth;
+pub mod jwt;
 pub mod todoist;
 pub mod types;
 pub mod utils;

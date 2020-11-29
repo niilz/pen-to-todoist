@@ -1,6 +1,7 @@
 use crate::types::todoist::{Project, ProjectResponse, Task, TaskResponse};
 use crate::utils;
 use js_sys::Array;
+use utils::fetch;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
@@ -89,18 +90,6 @@ fn init_request(mode: &str, url: &str, body: Option<&str>) -> Request {
     request
 }
 
-async fn fetch(request: Request) -> Result<JsValue, JsValue> {
-    let window = web_sys::window().unwrap();
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await;
-    match resp_value {
-        Ok(resp_value) => {
-            let resp: Response = resp_value.dyn_into().unwrap();
-            JsFuture::from(resp.json().unwrap()).await
-        }
-        Err(e) => Err(e),
-    }
-}
-
 async fn fetch_all_projects() -> Option<Vec<ProjectResponse>> {
     utils::set_panic_hook();
     let request = init_request("GET", PROJECTS_URL, None);
@@ -118,13 +107,6 @@ async fn fetch_all_projects() -> Option<Vec<ProjectResponse>> {
         }
         Err(_) => None,
     }
-}
-
-fn _console_log<JS>(ident: &str, value: &JS)
-where
-    JS: std::fmt::Debug,
-{
-    web_sys::console::log_1(&JsValue::from(&format!("{}: {:?}", ident, value)));
 }
 
 #[wasm_bindgen]
