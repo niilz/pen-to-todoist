@@ -1,15 +1,20 @@
 use crate::auth;
+use crate::jwt;
 use crate::types::vision_api as va;
+use crate::utils::console_log;
 use std::io;
+use wasm_bindgen::prelude::*;
 
-/*
-pub(crate) async fn img_data_to_string(img_data: String) -> io::Result<String> {
-    let jwt = auth::create_jwt().unwrap();
-    let client = Client::new();
-    let access_token_res = auth::get_access_token(jwt, &client)
-        .await
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+#[wasm_bindgen]
+pub async fn img_data_to_string(img_data: String) -> Result<JsValue, JsValue> {
+    let jwt = jwt::create_jwt().expect("Could not create jwt");
+    let access_token_res = auth::get_access_token(&jwt).await;
+    match access_token_res {
+        Ok(token) => console_log("YES TOKEN", &token),
+        Err(e) => console_log("schade", &e),
+    }
 
+    /*
     let api_res = ask_google_vision_api(img_data, access_token_res.access_token, &client)
         .await
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
@@ -24,8 +29,11 @@ pub(crate) async fn img_data_to_string(img_data: String) -> io::Result<String> {
         text_from_api
     );
     Ok(text_from_api)
+    */
+    Ok(JsValue::UNDEFINED)
 }
 
+/*
 pub async fn ask_google_vision_api(
     img_data: String,
     access_token: String,

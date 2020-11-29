@@ -1,10 +1,9 @@
 use crate::utils::{console_log, fetch};
-use jwt_simple::{claims, prelude::*};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use web_sys::{Request, RequestInit};
 
-pub(crate) const ONE_HOUR_MILLIS: i64 = 60 * 60 * 10000;
+pub(crate) const ONE_HOUR_SECS: i64 = 60 * 60;
 const GOOGLE_OAUTH_URL: &str = "https://oauth2.googleapis.com/token";
 
 #[wasm_bindgen]
@@ -21,8 +20,12 @@ pub async fn get_access_token(jwt: &str) -> Result<AccessTokenResponse, JsValue>
     let request = init_request(form);
     console_log("auth.rs/get_access_token():", &"Got Token Response");
 
-    let res_json = fetch(request).await?;
-    Ok(res_json
+    let res_json = fetch(request).await;
+    match &res_json {
+        Ok(json) => console_log("token_res", &json),
+        Err(e) => console_log("token_res_error", &e),
+    }
+    Ok(res_json?
         .into_serde::<AccessTokenResponse>()
         .expect("Could not convert into JSON"))
 }
@@ -33,10 +36,12 @@ fn init_request(form: web_sys::FormData) -> Request {
     opts.body(Some(&form));
     let request =
         Request::new_with_str_and_init(GOOGLE_OAUTH_URL, &opts).expect("Could not create response");
+    /*
     request
         .headers()
         .set("Content-Type", "multipart/form-data")
         .unwrap();
+    */
     request
 }
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
@@ -65,14 +70,17 @@ pub(crate) struct Claims {
 
 impl Claims {
     pub(crate) fn new(email: &str, api_endpoint: &str) -> Self {
-        let now = js_sys::Date::now() as i64;
+        let now = (js_sys::Date::now() / 1000f64) as i64;
+        console_log("now", &now);
+        console_log("one hour ins millis", &ONE_HOUR_SECS);
+        console_log("exp", &(now + ONE_HOUR_SECS));
         Claims {
             iss: email.to_string(),
             sub: email.to_string(),
             scope: "https://www.googleapis.com/auth/cloud-platform".to_string(),
             aud: api_endpoint.to_string(),
             iat: now,
-            exp: (now + ONE_HOUR_MILLIS),
+            exp: (now + ONE_HOUR_SECS),
         }
     }
 }
