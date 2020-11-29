@@ -50,18 +50,18 @@ pub mod vision_api {
         }
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Debug)]
     pub struct Responses {
         pub responses: Vec<Response>,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct Response {
         pub full_text_annotation: FullTextAnnotation,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Debug)]
     pub struct FullTextAnnotation {
         // only interested in final text for now
         pub text: String,
