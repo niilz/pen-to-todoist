@@ -1,6 +1,5 @@
 use crate::types::todoist::{Project, ProjectResponse, Task, TaskResponse};
 use crate::utils;
-use js_sys::Array;
 use utils::fetch;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
@@ -12,12 +11,14 @@ const TASKS_URL: &str = "https://api.todoist.com/rest/v1/tasks";
 const SHOPPING_LIST: &str = "Einkaufsliste";
 const TOKEN: &str = "3d3698a47222e41791894ab11a71c8c912aa1b90";
 
-#[wasm_bindgen]
-pub async fn make_shopping_list(items: Array) -> JsValue {
+pub(crate) async fn make_shopping_list<'a, I>(items: I) -> JsValue
+where
+    I: Iterator<Item = &'a str>,
+{
     match get_shopping_list_id().await {
         Some(shopping_list_id) => {
-            for item in items.iter() {
-                create_task(Task::new(&item.as_string().unwrap(), shopping_list_id))
+            for item in items {
+                create_task(Task::new(&item, shopping_list_id))
                     .await
                     .expect("Could not create item. sorryyyy");
             }
@@ -107,9 +108,4 @@ async fn fetch_all_projects() -> Option<Vec<ProjectResponse>> {
         }
         Err(_) => None,
     }
-}
-
-#[wasm_bindgen]
-pub fn it_works() -> String {
-    "WORKS from RUST".to_string()
 }

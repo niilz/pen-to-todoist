@@ -2,7 +2,6 @@ use crate::auth::{Claims, Creds};
 use crate::utils::console_log;
 use base64::{CharacterSet::UrlSafe, Config};
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
 
 const CREDENTIAL_JSON: &str = r#"{
   "type": "service_account",
@@ -17,30 +16,27 @@ const CREDENTIAL_JSON: &str = r#"{
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/master-dev%40hand-to-list.iam.gserviceaccount.com"
 }"#;
 
-#[wasm_bindgen]
-pub fn create_jwt() -> Option<String> {
+pub(crate) fn create_jwt() -> Option<String> {
     // Load credentials
     let creds: Creds = serde_json::from_str(CREDENTIAL_JSON).unwrap();
 
     let header = Header::new();
-    console_log("header", &header);
     let header_json = serde_json::to_string(&header).unwrap();
-    console_log("header_json", &header_json);
     let claims = Claims::new(&creds.client_email, &creds.token_uri);
-    console_log("claims", &claims);
     let claims_json = serde_json::to_string(&claims).unwrap();
-    console_log("claims_json", &claims_json);
+    console_log("WASM - jwt.rs", &"created JWT-header and claims");
 
     let config = Config::new(UrlSafe, false);
 
     let header_64 = base64::encode_config(header_json, config);
     let claims_64 = base64::encode_config(claims_json, config);
+    console_log("WASM - jwt.rs", &"base64-encoded JWT-header and claims");
 
     let jwt_data = format!("{}.{}", header_64, claims_64);
-    console_log("header_64.claims_64", &jwt_data);
+    console_log("WASM - jwt.rs", &"connected header_64.claims_64");
 
     let private_key = create_private_key(&creds.private_key);
-    console_log("public_key", &private_key);
+    console_log("WASM - jwt.rs", &"created private key");
 
     let jwt_data_hashed = hmac_sha256::Hash::hash(jwt_data.as_bytes());
     let padding_scheme = rsa::PaddingScheme::new_pkcs1v15_sign(Some(rsa::Hash::SHA2_256));
@@ -48,10 +44,10 @@ pub fn create_jwt() -> Option<String> {
         .sign(padding_scheme, &jwt_data_hashed)
         .expect("Could not sign jwt-data");
     let signature_64 = base64::encode_config(signature, config);
-    console_log("signature_64", &signature_64);
+    console_log("WASM - jwt.rs", &"created-signature");
 
     let jwt = format!("{}.{}.{}", header_64, claims_64, signature_64);
-    console_log("jwt", &jwt);
+    console_log("WASM - jwt.rs", &"Finalized JWT");
     Some(jwt)
 }
 

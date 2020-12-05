@@ -7,34 +7,36 @@ use web_sys::{Request, RequestInit};
 
 const VISION_API_URL: &str = "https://vision.googleapis.com/v1/images:annotate";
 
-#[wasm_bindgen]
-pub async fn img_data_to_string(img_data: String) -> Result<String, JsValue> {
+pub(crate) async fn img_data_to_string(img_data: String) -> Result<String, JsValue> {
     let jwt = jwt::create_jwt().expect("Could not create jwt");
     let access_token = auth::get_access_token(&jwt).await?;
 
     let api_res_json = ask_google_vision_api(img_data, access_token.access_token).await?;
-    console_log("Google-api-res", &api_res_json);
+    console_log("WASM - vision_api.rs", &"google answered with token");
 
     let text_from_api = api_res_json.responses[0].full_text_annotation.text.clone();
-    console_log(
-        "vision_api.rs/img_data_to_string(): Retrieving digitized list-items from JSON-response.",
-        &text_from_api,
-    );
+    console_log("WASM - vision_api.rs", &text_from_api);
     Ok(text_from_api)
 }
 
-pub async fn ask_google_vision_api(
+async fn ask_google_vision_api(
     img_data: String,
     access_token: String,
 ) -> Result<va::Responses, JsValue> {
     let requests_obj = va::Requests::from(img_data);
     let request_obj_json = serde_json::to_string(&requests_obj).unwrap();
-    console_log("request_obj_js", &request_obj_json);
+    console_log(
+        "WASM - vision_api.rs",
+        &"constructed image-translate-request-object",
+    );
 
     let request = init_request(&request_obj_json, &access_token);
 
     let res = fetch(request).await?;
-    console_log("vision_api.rs/ask_google_vision_api(): Sent image and access-token to vision-API and got response", &res);
+    console_log(
+        "WASM - vision_api.rs",
+        &"Sent image and access-token to vision-API and got response",
+    );
 
     match res.into_serde::<va::Responses>() {
         Ok(api_data_json) => Ok(api_data_json),

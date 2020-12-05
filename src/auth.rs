@@ -5,25 +5,21 @@ use web_sys::{Request, RequestInit};
 
 pub(crate) const ONE_HOUR_SECS: i64 = 60 * 60;
 const GOOGLE_OAUTH_URL: &str = "https://oauth2.googleapis.com/token";
+const GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:jwt-bearer";
+const VISION_API_SCOPE: &str = "https://www.googleapis.com/auth/cloud-platform";
 
-#[wasm_bindgen]
-pub fn auth() -> String {
-    "Hi from AUTH".to_string()
-}
-
-pub async fn get_access_token(jwt: &str) -> Result<AccessTokenResponse, JsValue> {
+pub(crate) async fn get_access_token(jwt: &str) -> Result<AccessTokenResponse, JsValue> {
     let form = web_sys::FormData::new().unwrap();
-    form.append_with_str("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
-        .unwrap();
+    form.append_with_str("grant_type", GRANT_TYPE).unwrap();
     form.append_with_str("assertion", jwt).unwrap();
 
     let request = init_request(form);
-    console_log("auth.rs/get_access_token():", &"Got Token Response");
+    console_log("WASM - auth.rs:", &"Got Token Response");
 
     let res_json = fetch(request).await?;
     match res_json.into_serde::<AccessTokenResponse>() {
-        Ok(accessToken) => Ok(accessToken),
-        Err(e) => Err(JsValue::NULL),
+        Ok(access_token) => Ok(access_token),
+        Err(_) => Err(JsValue::NULL),
     }
 }
 
@@ -35,6 +31,7 @@ fn init_request(form: web_sys::FormData) -> Request {
         Request::new_with_str_and_init(GOOGLE_OAUTH_URL, &opts).expect("Could not create response");
     request
 }
+
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Creds {
     pub(crate) r#type: String,
@@ -65,7 +62,7 @@ impl Claims {
         Claims {
             iss: email.to_string(),
             sub: email.to_string(),
-            scope: "https://www.googleapis.com/auth/cloud-platform".to_string(),
+            scope: VISION_API_SCOPE.to_string(),
             aud: api_endpoint.to_string(),
             iat: now,
             exp: (now + ONE_HOUR_SECS),
