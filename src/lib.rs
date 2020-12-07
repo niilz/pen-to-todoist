@@ -23,12 +23,16 @@ use vision_api::img_data_to_string;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-pub async fn todoist_from_handwriting(img_data: String) -> JsValue {
-    let list_as_string = img_data_to_string(img_data).await;
+pub async fn todoist_from_handwriting(
+    img_data: String,
+    todoist_token: String,
+    credentials_json: String,
+) -> JsValue {
+    let list_as_string = img_data_to_string(img_data, &credentials_json).await;
     match list_as_string {
         Ok(list) => {
             let digital_list = list.split_terminator('\n');
-            make_shopping_list(digital_list).await
+            make_shopping_list(digital_list, &todoist_token).await
         }
         Err(e) => {
             utils::console_log("Error", &e);

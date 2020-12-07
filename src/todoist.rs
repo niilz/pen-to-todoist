@@ -9,16 +9,15 @@ use web_sys::{self, Request, RequestInit, Response};
 const PROJECTS_URL: &str = "https://api.todoist.com/rest/v1/projects";
 const TASKS_URL: &str = "https://api.todoist.com/rest/v1/tasks";
 const SHOPPING_LIST: &str = "Einkaufsliste";
-const TOKEN: &str = "3d3698a47222e41791894ab11a71c8c912aa1b90";
 
-pub(crate) async fn make_shopping_list<'a, I>(items: I) -> JsValue
+pub(crate) async fn make_shopping_list<'a, I>(items: I, token: &str) -> JsValue
 where
     I: Iterator<Item = &'a str>,
 {
-    match get_shopping_list_id().await {
+    match get_shopping_list_id(token).await {
         Some(shopping_list_id) => {
             for item in items {
-                create_task(Task::new(&item, shopping_list_id))
+                create_task(Task::new(&item, shopping_list_id), token)
                     .await
                     .expect("Could not create item. sorryyyy");
             }
@@ -28,15 +27,15 @@ where
     }
 }
 
-async fn get_shopping_list_id() -> Option<u64> {
-    let projects: Vec<ProjectResponse> = fetch_all_projects()
+async fn get_shopping_list_id(token: &str) -> Option<u64> {
+    let projects: Vec<ProjectResponse> = fetch_all_projects(token)
         .await
         .expect("Could not get all Projects");
     let maybe_shopping_list = projects.iter().find(|proj| proj.name == SHOPPING_LIST);
     match maybe_shopping_list {
         Some(list) => Some(list.id),
         None => {
-            let new_project = create_project(Project::new(SHOPPING_LIST))
+            let new_project = create_project(Project::new(SHOPPING_LIST), token)
                 .await
                 .expect("Could not create ShoppingList-Project");
             Some(new_project.id)
@@ -44,9 +43,9 @@ async fn get_shopping_list_id() -> Option<u64> {
     }
 }
 
-async fn create_project(project: Project) -> Option<ProjectResponse> {
+async fn create_project(project: Project, token: &str) -> Option<ProjectResponse> {
     let project_json = serde_json::to_string(&project).expect("Could not convert project to json");
-    let request = init_request("POST", PROJECTS_URL, Some(&project_json));
+    let request = init_request("POST", PROJECTS_URL, Some(&project_json), token);
 
     let json = fetch(request).await;
     match json {
@@ -55,9 +54,9 @@ async fn create_project(project: Project) -> Option<ProjectResponse> {
     }
 }
 
-async fn create_task(task: Task) -> Option<TaskResponse> {
+async fn create_task(task: Task, token: &str) -> Option<TaskResponse> {
     let task_json = serde_json::to_string(&task).expect("Could not convert task to json");
-    let request = init_request("POST", TASKS_URL, Some(&task_json));
+    let request = init_request("POST", TASKS_URL, Some(&task_json), token);
 
     let json = fetch(request).await;
     match json {
@@ -66,7 +65,7 @@ async fn create_task(task: Task) -> Option<TaskResponse> {
     }
 }
 
-fn init_request(mode: &str, url: &str, body: Option<&str>) -> Request {
+fn init_request(mode: &str, url: &str, body: Option<&str>, token: &str) -> Request {
     let mut opts = RequestInit::new();
     opts.method(mode);
     if body.is_some() {
@@ -75,7 +74,7 @@ fn init_request(mode: &str, url: &str, body: Option<&str>) -> Request {
     let request = Request::new_with_str_and_init(url, &opts).expect("Could not create response");
     request
         .headers()
-        .set("Authorization", &format!("Bearer {}", TOKEN))
+        .set("Authorization", &format!("Bearer {}", token))
         .unwrap();
 
     if mode == "POST" {
@@ -91,9 +90,9 @@ fn init_request(mode: &str, url: &str, body: Option<&str>) -> Request {
     request
 }
 
-async fn fetch_all_projects() -> Option<Vec<ProjectResponse>> {
+async fn fetch_all_projects(token: &str) -> Option<Vec<ProjectResponse>> {
     utils::set_panic_hook();
-    let request = init_request("GET", PROJECTS_URL, None);
+    let request = init_request("GET", PROJECTS_URL, None, token);
 
     let window = web_sys::window().unwrap();
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await;

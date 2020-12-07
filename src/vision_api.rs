@@ -7,8 +7,11 @@ use web_sys::{Request, RequestInit};
 
 const VISION_API_URL: &str = "https://vision.googleapis.com/v1/images:annotate";
 
-pub(crate) async fn img_data_to_string(img_data: String) -> Result<String, JsValue> {
-    let jwt = jwt::create_jwt().expect("Could not create jwt");
+pub(crate) async fn img_data_to_string(
+    img_data: String,
+    credentials_json: &str,
+) -> Result<String, JsValue> {
+    let jwt = jwt::create_jwt(credentials_json).expect("Could not create jwt");
     let access_token = auth::get_access_token(&jwt).await?;
 
     let api_res_json = ask_google_vision_api(img_data, access_token.access_token).await?;
