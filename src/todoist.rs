@@ -10,37 +10,29 @@ const PROJECTS_URL: &str = "https://api.todoist.com/rest/v1/projects";
 const TASKS_URL: &str = "https://api.todoist.com/rest/v1/tasks";
 const SHOPPING_LIST: &str = "Einkaufsliste";
 
-pub(crate) async fn make_shopping_list<'a, I>(items: I, token: &str) -> JsValue
+pub(crate) async fn make_or_update_project<'a, I>(list_id: u32, items: I, token: &str) -> JsValue
 where
     I: Iterator<Item = &'a str>,
 {
-    match get_shopping_list_id(token).await {
-        Some(shopping_list_id) => {
-            for item in items {
-                create_task(Task::new(&item, shopping_list_id), token)
-                    .await
-                    .expect("Could not create item. sorryyyy");
-            }
-            JsValue::from(shopping_list_id as f64)
-        }
-        None => JsValue::NULL,
+    let id = if list_id == 0 {
+        create_shopping_list(token).await.unwrap()
+    } else {
+        list_id
+    };
+
+    for item in items {
+        create_task(Task::new(&item, id as u64), token)
+            .await
+            .expect("Could not create item. sorryyyy");
     }
+    JsValue::from(id)
 }
 
-async fn get_shopping_list_id(token: &str) -> Option<u64> {
-    let projects: Vec<ProjectResponse> = fetch_all_projects(token)
+async fn create_shopping_list(token: &str) -> Option<u32> {
+    let new_project = create_project(Project::new(SHOPPING_LIST), token)
         .await
-        .expect("Could not get all Projects");
-    let maybe_shopping_list = projects.iter().find(|proj| proj.name == SHOPPING_LIST);
-    match maybe_shopping_list {
-        Some(list) => Some(list.id),
-        None => {
-            let new_project = create_project(Project::new(SHOPPING_LIST), token)
-                .await
-                .expect("Could not create ShoppingList-Project");
-            Some(new_project.id)
-        }
-    }
+        .expect("Could not create ShoppingList-Project");
+    Some(new_project.id as u32)
 }
 
 async fn create_project(project: Project, token: &str) -> Option<ProjectResponse> {
@@ -90,7 +82,7 @@ fn init_request(mode: &str, url: &str, body: Option<&str>, token: &str) -> Reque
     request
 }
 
-async fn fetch_all_projects(token: &str) -> Option<Vec<ProjectResponse>> {
+pub(crate) async fn fetch_all_projects(token: &str) -> Option<JsValue> {
     utils::set_panic_hook();
     let request = init_request("GET", PROJECTS_URL, None, token);
 
@@ -99,11 +91,8 @@ async fn fetch_all_projects(token: &str) -> Option<Vec<ProjectResponse>> {
     match resp_value {
         Ok(resp_val) => {
             let resp: Response = resp_val.dyn_into().unwrap();
-            let json = JsFuture::from(resp.json().unwrap())
-                .await
-                .expect("Could not transform Json");
-            let list_of_projects: Vec<ProjectResponse> = json.into_serde().unwrap();
-            Some(list_of_projects)
+            // Vec<ProjectResponse> as Json
+            JsFuture::from(resp.json().unwrap()).await.ok()
         }
         Err(_) => None,
     }

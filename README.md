@@ -33,3 +33,13 @@ A client is supposed to pass:
 
 Based on the todoist-api token the correct account is adressed in the creation request.
 Additionaliy, every user of this libray (every client) needs it's own account with google-cloud where the vision api is activated.
+
+## How to use
+
+compile with wasm-pack web (no web-pack bundle):
+
+```
+wasm-pack build --no-typescript --target web
+```
+
+Copy `pkg` folder, which contains wasm-module, into `pen-to-todojst` project.
