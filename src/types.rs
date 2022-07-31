@@ -101,7 +101,7 @@ pub mod todoist {
     pub struct Task {
         content: String,
         project_id: Option<u64>,
-        label_ids: Option<Vec<u32>>,
+        label_ids: Vec<u32>,
         // only one due_* can be used
         due_string: Option<String>,
         due_date: Option<String>,
