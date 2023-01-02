@@ -6,8 +6,8 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{self, Request, RequestInit, Response};
 
-const PROJECTS_URL: &str = "https://api.todoist.com/rest/v1/projects";
-const TASKS_URL: &str = "https://api.todoist.com/rest/v1/tasks";
+const PROJECTS_URL: &str = "https://api.todoist.com/rest/v2/projects";
+const TASKS_URL: &str = "https://api.todoist.com/rest/v2/tasks";
 const SHOPPING_LIST: &str = "Einkaufsliste";
 
 pub(crate) async fn make_or_update_project<'a, I>(list_id: u32, items: I, token: &str) -> JsValue
