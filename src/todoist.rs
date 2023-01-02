@@ -21,6 +21,7 @@ where
     };
 
     for item in items {
+        utils::console_log("WASM - creating Task for item:", &item);
         create_task(Task::new(&item, id as u64), token)
             .await
             .expect("Could not create item. sorryyyy");
@@ -47,13 +48,32 @@ async fn create_project(project: Project, token: &str) -> Option<ProjectResponse
 }
 
 async fn create_task(task: Task, token: &str) -> Option<TaskResponse> {
+    utils::console_log("WASM - creating json for task", &task);
     let task_json = serde_json::to_string(&task).expect("Could not convert task to json");
+    utils::console_log("WASM - created json", &"");
     let request = init_request("POST", TASKS_URL, Some(&task_json), token);
+    utils::console_log("WASM - created-request", &"");
 
     let json = fetch(request).await;
+    utils::console_log("WASM - sent task-request to todois-api", &"");
     match json {
-        Ok(json) => json.into_serde::<TaskResponse>().ok(),
-        Err(_) => None,
+        Ok(json) => match json.into_serde::<TaskResponse>() {
+            Ok(task_response) => {
+                utils::console_log(
+                    "WASM - todoist-response to TaskResponse was successful",
+                    &"",
+                );
+                Some(task_response)
+            }
+            Err(e) => {
+                utils::console_log("WASM - conversion todoist-response got error:", &e);
+                None
+            }
+        },
+        Err(e) => {
+            utils::console_log("WASM - error", &e);
+            None
+        }
     }
 }
 
