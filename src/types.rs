@@ -117,25 +117,32 @@ pub mod todoist {
     }
 
     #[derive(Debug, Deserialize, Default)]
-    pub struct TaskResponse {
-        comment_count: u32,
-        completed: bool,
-        content: String,
-        due: Option<Due>,
-        id: u64,
+    pub(crate) struct TaskResponse {
+        id: String,
+        assigner_id: Option<String>,
+        assignee_id: Option<String>,
+        project_id: String,
+        section_id: Option<String>,
+        parent_id: Option<String>,
         order: u32,
-        priority: u32,
-        project_id: u32,
-        section_id: u32,
-        parent_id: Option<u32>,
+        content: String,
+        description: String,
+        is_completed: bool,
+        labels: Vec<String>,
+        priority: u8,
+        comment_count: u32,
+        creator_id: Option<String>,
+        created_at: String,
+        due: Option<Due>,
         url: String,
     }
 
     #[derive(Debug, Deserialize, Default)]
     pub struct Due {
-        date: String,
-        datetime: String,
         string: String,
+        date: String,
+        is_recurring: bool,
+        datetime: String,
         timezone: String,
     }
 }
