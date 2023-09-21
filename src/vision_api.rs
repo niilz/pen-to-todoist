@@ -22,7 +22,7 @@ pub(crate) async fn img_data_to_string(
     Ok(text_from_api)
 }
 
-pub async fn ask_google_vision_api(
+pub(crate) async fn ask_google_vision_api(
     img_data: String,
     access_token: String,
 ) -> Result<va::Responses, JsValue> {
@@ -62,4 +62,30 @@ fn init_request(request_obj: &str, access_token: &str) -> Request {
         .set("Content-Type", "application/json")
         .unwrap();
     request
+}
+
+#[cfg(test)]
+mod test {
+
+    extern crate wasm_bindgen_test;
+
+    use wasm_bindgen_test::*;
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    use super::ask_google_vision_api;
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    #[wasm_bindgen_test]
+    async fn fails_without_token() {
+        let response = ask_google_vision_api("picture-data".to_string(), "token".to_string()).await;
+        assert!(response.is_err());
+        let Err(e) = response else {
+            unreachable!("we checked it's an error")
+        };
+        let has_correct_error = e
+            .as_string()
+            .expect("test fails: JsValue cannot be converted to string")
+            .contains("missing field `responses`");
+        assert!(has_correct_error);
+    }
 }
