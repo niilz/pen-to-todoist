@@ -43,3 +43,11 @@ wasm-pack build --no-typescript --target web
 ```
 
 Copy `pkg` folder, which contains wasm-module, into `pen-to-todojst` project.
+
+## Running Tests
+
+use `wasm-pack` to run tests:
+
+```
+wasm-pack test --chrome
+```
