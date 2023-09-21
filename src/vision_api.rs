@@ -22,7 +22,7 @@ pub(crate) async fn img_data_to_string(
     Ok(text_from_api)
 }
 
-async fn ask_google_vision_api(
+pub async fn ask_google_vision_api(
     img_data: String,
     access_token: String,
 ) -> Result<va::Responses, JsValue> {
