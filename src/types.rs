@@ -57,14 +57,22 @@ pub mod vision_api {
 
     #[derive(Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
-    pub struct Response {
-        pub full_text_annotation: FullTextAnnotation,
+    pub enum Response {
+        FullTextAnnotation(FullTextAnnotation),
+        Error(ApiError),
     }
 
     #[derive(Deserialize, Debug)]
     pub struct FullTextAnnotation {
         // only interested in final text for now
         pub text: String,
+    }
+
+    #[derive(Deserialize, Debug)]
+    pub struct ApiError {
+        // only interested in final text for now
+        pub code: u32,
+        pub message: String,
     }
 }
 
