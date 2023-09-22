@@ -41,6 +41,9 @@ pub(crate) async fn ask_google_vision_api(
         &"Sent image and access-token to vision-API and got response",
     );
 
+    #[cfg(test)]
+    console_log("WASM - vision_api.rs", &format!("got response: ${res:?}"));
+
     match res.into_serde::<va::Responses>() {
         Ok(api_data_json) => Ok(api_data_json),
         Err(e) => Err(JsValue::from_str(&e.to_string())),
@@ -72,8 +75,11 @@ mod test {
     use wasm_bindgen_test::*;
     wasm_bindgen_test_configure!(run_in_browser);
 
+    use crate::{auth, jwt, utils};
+
     use super::ask_google_vision_api;
     use wasm_bindgen_test::wasm_bindgen_test;
+    const GOOGLE_VISION_API_KEY: &str = include_str!("../vision-api-key.json");
 
     #[wasm_bindgen_test]
     async fn fails_without_token() {
@@ -87,5 +93,19 @@ mod test {
             .expect("test fails: JsValue cannot be converted to string")
             .contains("missing field `responses`");
         assert!(has_correct_error);
+    }
+
+    #[wasm_bindgen_test]
+    async fn zero_bytes_give_empty_response() {
+        let jwt = jwt::create_jwt(GOOGLE_VISION_API_KEY)
+            .expect("test fails: could not create jwt from credentials");
+        let access_token = auth::get_access_token(&jwt)
+            .await
+            .expect("test fails: could not load an access_token");
+        let mock_picture_data = base64::encode("12345");
+
+        let response = ask_google_vision_api(mock_picture_data, access_token.access_token).await;
+        utils::console_log("zero_bytes_test", &format!("${response:?}"));
+        assert!(!response.is_err());
     }
 }
