@@ -25,7 +25,7 @@ pub async fn fetch(request: Request) -> Result<JsValue, JsValue> {
     }
 }
 
-pub(crate) fn console_log<JS>(ident: &str, value: &JS)
+pub fn console_log<JS>(ident: &str, value: &JS)
 where
     JS: std::fmt::Debug,
 {
