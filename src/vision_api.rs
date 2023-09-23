@@ -164,6 +164,7 @@ mod test {
         else {
             panic!("test fails: Error type was expected but");
         };
-        assert_eq!("The data", fta.text);
+        let expected_data = "Аму Thomas\nChelsea Cook\nJoel Nylund\nKIM TAYLOR";
+        assert_eq!(expected_data, fta.text);
     }
 }
