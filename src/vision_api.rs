@@ -84,6 +84,7 @@ mod test {
 
     extern crate wasm_bindgen_test;
 
+    use wasm_bindgen::JsValue;
     use wasm_bindgen_test::*;
     wasm_bindgen_test_configure!(run_in_browser);
 
@@ -109,16 +110,8 @@ mod test {
 
     #[wasm_bindgen_test]
     async fn bad_image_data_gives_error_response() {
-        let jwt = jwt::create_jwt(GOOGLE_VISION_API_KEY)
-            .expect("test fails: could not create jwt from credentials");
-        let access_token = auth::get_access_token(&jwt)
-            .await
-            .expect("test fails: could not load an access_token");
+        let response = make_authenticated_test_request(b"12345").await;
 
-        let mock_picture_data = base64::encode("12345");
-
-        let response = ask_google_vision_api(mock_picture_data, access_token.access_token).await;
-        utils::console_log("zero_bytes_test", &format!("${response:?}"));
         assert!(!response.is_err());
         let Ok(err) = response else {
             unreachable!("we checked it's not an error")
@@ -126,9 +119,6 @@ mod test {
         let Response {
             error: Some(error), ..
         } = err
-            .responses
-            .get(0)
-            .expect("test fails: 0th element should be present")
         else {
             panic!("test fails: Error type was expected but");
         };
@@ -138,17 +128,9 @@ mod test {
 
     #[wasm_bindgen_test]
     async fn valid_picture_gives_valid_response() {
-        let jwt = jwt::create_jwt(GOOGLE_VISION_API_KEY)
-            .expect("test fails: could not create jwt from credentials");
-        let access_token = auth::get_access_token(&jwt)
-            .await
-            .expect("test fails: could not load an access_token");
-
         let mock_picture_data = include_bytes!("../handwritten-list.png");
-        let mock_picture_data = base64::encode(mock_picture_data);
 
-        let response = ask_google_vision_api(mock_picture_data, access_token.access_token).await;
-        utils::console_log("valid_picture_test", &format!("${response:?}"));
+        let response = make_authenticated_test_request(mock_picture_data).await;
 
         assert!(!response.is_err());
 
@@ -160,13 +142,34 @@ mod test {
             full_text_annotation: Some(full_text_annotation),
             ..
         } = response
-            .responses
-            .get(0)
-            .expect("test fails: 0th element should be present")
         else {
             panic!("test fails: Error type was expected but");
         };
         let expected_data = "Аму Thomas\nChelsea Cook\nJoel Nylund\nKIM TAYLOR";
         assert_eq!(expected_data, full_text_annotation.text);
+    }
+
+    async fn make_authenticated_test_request(mock_data: &[u8]) -> Result<Response, JsValue> {
+        let jwt = jwt::create_jwt(GOOGLE_VISION_API_KEY)
+            .expect("test fails: could not create jwt from credentials");
+        let access_token = auth::get_access_token(&jwt)
+            .await
+            .expect("test fails: could not load an access_token");
+
+        let mock_picture_data = base64::encode(mock_data);
+
+        let response = ask_google_vision_api(mock_picture_data, access_token.access_token).await;
+        utils::console_log("zero_bytes_test", &format!("${response:?}"));
+        match response {
+            Ok(res) => {
+                let res = res
+                    .responses
+                    .into_iter()
+                    .next()
+                    .expect("test fails: 0th element should be present");
+                Ok(res)
+            }
+            Err(e) => Err(e),
+        }
     }
 }
