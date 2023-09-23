@@ -71,7 +71,7 @@ pub mod vision_api {
 
     #[derive(Deserialize, Debug)]
     pub struct EntityAnnotation {
-        description: String,
+        pub description: String,
     }
 
     #[derive(Deserialize, Debug)]
