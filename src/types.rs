@@ -70,8 +70,29 @@ pub mod vision_api {
     }
 
     #[derive(Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
     pub struct EntityAnnotation {
         pub description: String,
+        pub bounding_poly: BoundingPoly,
+    }
+
+    #[derive(Deserialize, Debug)]
+    pub struct BoundingPoly {
+        pub vertices: Vertices,
+    }
+
+    #[derive(Deserialize, Debug)]
+    pub struct Vertices {
+        pub top_left: Vertice,
+        pub top_right: Vertice,
+        pub bottom_right: Vertice,
+        pub bottom_left: Vertice,
+    }
+
+    #[derive(Deserialize, Debug)]
+    pub struct Vertice {
+        pub x: Option<u32>,
+        pub y: Option<u32>,
     }
 
     #[derive(Deserialize, Debug)]
