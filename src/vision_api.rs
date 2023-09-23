@@ -1,7 +1,6 @@
 use crate::auth;
 use crate::jwt;
 use crate::types::vision_api as va;
-use crate::types::vision_api::Response;
 use crate::utils::{console_log, fetch};
 use wasm_bindgen::prelude::*;
 use web_sys::{Request, RequestInit};
@@ -18,9 +17,16 @@ pub(crate) async fn img_data_to_string(
     let api_res_json = ask_google_vision_api(img_data, access_token.access_token).await?;
     console_log("WASM - vision_api.rs", &"google answered with token");
 
-    let text_from_api = match &api_res_json.responses[0] {
-        Response::FullTextAnnotation(text) => text.text.clone(),
-        Response::Error(err) => return Err(JsValue::from_str(&err.message)),
+    let response = &api_res_json.responses[0];
+
+    let text_from_api = match (
+        &response.text_annotations,
+        &response.full_text_annotation,
+        &response.error,
+    ) {
+        (Some(_ta), Some(fta), None) => fta.text.clone(),
+        (None, None, Some(error)) => return Err(JsValue::from_str(&error.message)),
+        _ => return Err(JsValue::from_str("unexpected structure")),
     };
     console_log("WASM - vision_api.rs", &text_from_api);
     Ok(text_from_api)
@@ -115,14 +121,49 @@ mod test {
         let Ok(err) = response else {
             unreachable!("we checked it's not an error")
         };
-        let Response::Error(err) = err
+        let Response {
+            error: Some(error), ..
+        } = err
             .responses
             .get(0)
             .expect("test fails: 0th element should be present")
         else {
             panic!("test fails: Error type was expected but");
         };
-        assert_eq!(3, err.code);
-        assert_eq!("Bad image data.", err.message);
+        assert_eq!(3, error.code);
+        assert_eq!("Bad image data.", error.message);
+    }
+
+    #[wasm_bindgen_test]
+    async fn valid_picture_gives_valid_response() {
+        let jwt = jwt::create_jwt(GOOGLE_VISION_API_KEY)
+            .expect("test fails: could not create jwt from credentials");
+        let access_token = auth::get_access_token(&jwt)
+            .await
+            .expect("test fails: could not load an access_token");
+
+        let mock_picture_data = include_bytes!("../handwritten-list.png");
+        let mock_picture_data = base64::encode(mock_picture_data);
+
+        let response = ask_google_vision_api(mock_picture_data, access_token.access_token).await;
+        utils::console_log("valid_picture_test", &format!("${response:?}"));
+
+        assert!(!response.is_err());
+
+        let Ok(response) = response else {
+            unreachable!("we checked it's not an error")
+        };
+        let Response {
+            text_annotations: Some(_ta),
+            full_text_annotation: Some(fta),
+            ..
+        } = response
+            .responses
+            .get(0)
+            .expect("test fails: 0th element should be present")
+        else {
+            panic!("test fails: Error type was expected but");
+        };
+        assert_eq!("The data", fta.text);
     }
 }
