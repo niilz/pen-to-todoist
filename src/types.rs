@@ -83,16 +83,31 @@ pub mod vision_api {
 
     #[derive(Deserialize, Debug)]
     pub struct Vertices {
-        pub top_left: Vertice,
-        pub top_right: Vertice,
-        pub bottom_right: Vertice,
-        pub bottom_left: Vertice,
+        pub top_left: VerticeOption,
+        pub top_right: VerticeOption,
+        pub bottom_right: VerticeOption,
+        pub bottom_left: VerticeOption,
     }
 
     #[derive(Deserialize, Debug)]
-    pub struct Vertice {
+    pub struct VerticeOption {
         pub x: Option<u32>,
         pub y: Option<u32>,
+    }
+
+    #[derive(Debug)]
+    pub struct Vertice {
+        pub x: u32,
+        pub y: u32,
+    }
+    impl std::ops::Sub for VerticeOption {
+        type Output = Vertice;
+        fn sub(self, other: Self) -> Self::Output {
+            Vertice {
+                x: self.x.unwrap_or(0).saturating_sub(other.x.unwrap_or(0)),
+                y: self.y.unwrap_or(0).saturating_sub(other.y.unwrap_or(0)),
+            }
+        }
     }
 
     #[derive(Deserialize, Debug)]
