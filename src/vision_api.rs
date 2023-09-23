@@ -24,7 +24,9 @@ pub(crate) async fn img_data_to_string(
         &response.full_text_annotation,
         &response.error,
     ) {
-        (Some(_ta), Some(fta), None) => fta.text.clone(),
+        (Some(_text_annotations), Some(full_text_annotation), None) => {
+            full_text_annotation.text.clone()
+        }
         (None, None, Some(error)) => return Err(JsValue::from_str(&error.message)),
         _ => return Err(JsValue::from_str("unexpected structure")),
     };
@@ -154,8 +156,8 @@ mod test {
             unreachable!("we checked it's not an error")
         };
         let Response {
-            text_annotations: Some(_ta),
-            full_text_annotation: Some(fta),
+            text_annotations: Some(_text_annotations),
+            full_text_annotation: Some(full_text_annotation),
             ..
         } = response
             .responses
@@ -165,6 +167,6 @@ mod test {
             panic!("test fails: Error type was expected but");
         };
         let expected_data = "Аму Thomas\nChelsea Cook\nJoel Nylund\nKIM TAYLOR";
-        assert_eq!(expected_data, fta.text);
+        assert_eq!(expected_data, full_text_annotation.text);
     }
 }
