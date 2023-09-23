@@ -88,7 +88,11 @@ mod test {
     use wasm_bindgen_test::*;
     wasm_bindgen_test_configure!(run_in_browser);
 
-    use crate::{auth, jwt, types::vision_api::Response, utils};
+    use crate::{
+        auth, jwt,
+        types::vision_api::{EntityAnnotation, FullTextAnnotation, Response},
+        utils,
+    };
 
     use super::ask_google_vision_api;
     use wasm_bindgen_test::wasm_bindgen_test;
@@ -134,19 +138,23 @@ mod test {
 
         assert!(!response.is_err());
 
-        let Ok(response) = response else {
-            unreachable!("we checked it's not an error")
-        };
-        let Response {
-            text_annotations: Some(_text_annotations),
-            full_text_annotation: Some(full_text_annotation),
-            ..
-        } = response
-        else {
-            panic!("test fails: Error type was expected but");
-        };
+        let (_, full_text_annotation) = extract_test_response(response);
+
         let expected_data = "Аму Thomas\nChelsea Cook\nJoel Nylund\nKIM TAYLOR";
         assert_eq!(expected_data, full_text_annotation.text);
+    }
+
+    #[wasm_bindgen_test]
+    async fn finds_largest_item() {
+        let mock_picture_data = include_bytes!("../mythos-label.jpeg");
+
+        let response = make_authenticated_test_request(mock_picture_data).await;
+
+        assert!(!response.is_err());
+
+        let (text_annotations, _) = extract_test_response(response);
+        let expected_data = "Аму Thomas\nChelsea Cook\nJoel Nylund\nKIM TAYLOR";
+        assert_eq!(expected_data, text_annotations[0].description);
     }
 
     async fn make_authenticated_test_request(mock_data: &[u8]) -> Result<Response, JsValue> {
@@ -171,5 +179,21 @@ mod test {
             }
             Err(e) => Err(e),
         }
+    }
+
+    fn extract_test_response(
+        api_response: Result<Response, JsValue>,
+    ) -> (Vec<EntityAnnotation>, FullTextAnnotation) {
+        let response = api_response.expect("we checked it's not an error");
+        let Response {
+            text_annotations: Some(text_annotations),
+            full_text_annotation: Some(full_text_annotation),
+            ..
+        } = response
+        else {
+            panic!("test fails: Error type was expected but");
+        };
+
+        (text_annotations, full_text_annotation)
     }
 }
