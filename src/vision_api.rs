@@ -132,7 +132,7 @@ mod test {
 
     #[wasm_bindgen_test]
     async fn valid_picture_gives_valid_response() {
-        let mock_picture_data = include_bytes!("../handwritten-list.png");
+        let mock_picture_data = include_bytes!("../test-assets/handwritten-list.png");
 
         let response = make_authenticated_test_request(mock_picture_data).await;
 
@@ -146,15 +146,33 @@ mod test {
 
     #[wasm_bindgen_test]
     async fn finds_largest_item() {
-        let mock_picture_data = include_bytes!("../mythos-label.jpeg");
+        let mock_picture_data = include_bytes!("../test-assets/mythos-label.jpeg");
 
         let response = make_authenticated_test_request(mock_picture_data).await;
 
         assert!(!response.is_err());
 
         let (text_annotations, _) = extract_test_response(response);
-        let expected_data = "Аму Thomas\nChelsea Cook\nJoel Nylund\nKIM TAYLOR";
-        assert_eq!(expected_data, text_annotations[0].description);
+
+        let largest_item = find_largest_item(text_annotations);
+        let expected_data = "Mythos";
+        assert_eq!(expected_data, largest_item);
+    }
+
+    fn find_largest_item(text_annotations: Vec<EntityAnnotation>) -> String {
+        text_annotations
+            .into_iter()
+            // do not consider the entire picture (spanning over multiple lines)
+            .filter(|e| !e.description.contains('\n'))
+            .map(|e| (e.description, e.bounding_poly.vertices))
+            .map(|(e, vs)| (e, (vs.bottom_left - vs.top_left)))
+            .max_by_key(|(e, sizes)| {
+                #[cfg(test)]
+                utils::console_log("finding-largest", &format!("item: {e}, sizes: {sizes:?}"));
+                sizes.y
+            })
+            .expect("one must be the largest")
+            .0
     }
 
     async fn make_authenticated_test_request(mock_data: &[u8]) -> Result<Response, JsValue> {
