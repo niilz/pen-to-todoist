@@ -1,31 +1,67 @@
 use crate::auth;
 use crate::jwt;
 use crate::types::vision_api as va;
+use crate::types::vision_api::EntityAnnotation;
 use crate::utils::{console_log, fetch};
 use wasm_bindgen::prelude::*;
 use web_sys::{Request, RequestInit};
 
 const VISION_API_URL: &str = "https://vision.googleapis.com/v1/images:annotate";
 
-pub(crate) async fn img_data_to_string(
+pub(crate) async fn image_to_list_items(
     img_data: String,
     credentials_json: &str,
-) -> Result<String, JsValue> {
+) -> Result<TodoItem, JsValue> {
+    image_to_text(img_data, credentials_json, false).await
+}
+
+pub(crate) async fn image_to_single_item(
+    img_data: String,
+    credentials_json: &str,
+) -> Result<TodoItem, JsValue> {
+    image_to_text(img_data, credentials_json, true).await
+}
+
+#[derive(Debug)]
+pub(crate) enum TodoItem {
+    Single(String),
+    List(Vec<String>),
+}
+
+async fn image_to_text(
+    img_data: String,
+    credentials_json: &str,
+    single_todo: bool,
+) -> Result<TodoItem, JsValue> {
     let jwt = jwt::create_jwt(credentials_json).expect("Could not create jwt");
     let access_token = auth::get_access_token(&jwt).await?;
 
     let api_res_json = ask_google_vision_api(img_data, access_token.access_token).await?;
     console_log("WASM - vision_api.rs", &"google answered with token");
 
-    let response = &api_res_json.responses[0];
+    let response = api_res_json
+        .responses
+        .into_iter()
+        .next()
+        .expect("ok-response must have one element");
 
     let text_from_api = match (
-        &response.text_annotations,
-        &response.full_text_annotation,
-        &response.error,
+        response.text_annotations,
+        response.full_text_annotation,
+        response.error,
     ) {
-        (Some(_text_annotations), Some(full_text_annotation), None) => {
-            full_text_annotation.text.clone()
+        (Some(text_annotations), Some(full_text_annotation), None) => {
+            if single_todo {
+                TodoItem::Single(find_largest_item(text_annotations))
+            } else {
+                TodoItem::List(
+                    full_text_annotation
+                        .text
+                        .split_terminator('\n')
+                        .map(str::to_string)
+                        .collect(),
+                )
+            }
         }
         (None, None, Some(error)) => return Err(JsValue::from_str(&error.message)),
         _ => return Err(JsValue::from_str("unexpected structure")),
@@ -79,6 +115,21 @@ fn init_request(request_obj: &str, access_token: &str) -> Request {
     request
 }
 
+fn find_largest_item(text_annotations: Vec<EntityAnnotation>) -> String {
+    text_annotations
+        .into_iter()
+        // do not consider the entire picture (spanning over multiple lines)
+        .filter(|e| !e.description.contains('\n'))
+        .map(|e| (e.description, e.bounding_poly.vertices))
+        .map(|(e, vs)| (e, (vs.bottom_left - vs.top_left)))
+        .max_by_key(|(e, sizes)| {
+            #[cfg(test)]
+            console_log("finding-largest", &format!("item: {e}, sizes: {sizes:?}"));
+            sizes.y
+        })
+        .expect("one must be the largest")
+        .0
+}
 #[cfg(test)]
 mod test {
 
@@ -92,6 +143,7 @@ mod test {
         auth, jwt,
         types::vision_api::{EntityAnnotation, FullTextAnnotation, Response},
         utils,
+        vision_api::find_largest_item,
     };
 
     use super::ask_google_vision_api;
@@ -157,22 +209,6 @@ mod test {
         let largest_item = find_largest_item(text_annotations);
         let expected_data = "Mythos";
         assert_eq!(expected_data, largest_item);
-    }
-
-    fn find_largest_item(text_annotations: Vec<EntityAnnotation>) -> String {
-        text_annotations
-            .into_iter()
-            // do not consider the entire picture (spanning over multiple lines)
-            .filter(|e| !e.description.contains('\n'))
-            .map(|e| (e.description, e.bounding_poly.vertices))
-            .map(|(e, vs)| (e, (vs.bottom_left - vs.top_left)))
-            .max_by_key(|(e, sizes)| {
-                #[cfg(test)]
-                utils::console_log("finding-largest", &format!("item: {e}, sizes: {sizes:?}"));
-                sizes.y
-            })
-            .expect("one must be the largest")
-            .0
     }
 
     async fn make_authenticated_test_request(mock_data: &[u8]) -> Result<Response, JsValue> {
